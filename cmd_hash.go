@@ -661,12 +661,25 @@ func (m *Miniredis) cmdHexpire(c *server.Peer, cmd string, args []string) {
 		db := m.db(ctx.selectedDB)
 
 		if _, ok := db.keys[opts.key]; !ok {
-			c.WriteInt(-2)
+			c.WriteLen(len(opts.fields))
+			for range opts.fields {
+				c.WriteInt(-2)
+			}
+			return
+		}
+
+		if db.t(opts.key) != keyTypeHash {
+			c.WriteError(msgWrongType)
 			return
 		}
 
 		fieldTTLs := db.hashTTLs[opts.key]
+		if fieldTTLs == nil {
+			fieldTTLs = map[string]time.Duration{}
+			db.hashTTLs[opts.key] = fieldTTLs
+		}
 
+		c.WriteLen(len(opts.fields))
 		for _, field := range opts.fields {
 			if _, ok := db.hashKeys[opts.key][field]; !ok {
 				c.WriteInt(-2)
@@ -734,12 +747,16 @@ func parseHExpireArgs(args []string) (hexpireOpts, string) {
 		switch strings.ToLower(args[0]) {
 		case "nx":
 			opts.nx = true
+			args = args[1:]
 		case "xx":
 			opts.xx = true
+			args = args[1:]
 		case "gt":
 			opts.gt = true
+			args = args[1:]
 		case "lt":
 			opts.lt = true
+			args = args[1:]
 		case "fields":
 			var numFields int
 			if err := optIntSimple(args[1], &numFields); err != nil {
@@ -755,10 +772,10 @@ func parseHExpireArgs(args []string) (hexpireOpts, string) {
 			}
 
 			opts.fields = append([]string{}, args[2:2+numFields]...)
+			args = args[2+numFields:]
 		default:
 			return hexpireOpts{}, fmt.Sprintf(msgMandatoryArgument, "FIELDS")
 		}
-		args = args[1:]
 	}
 
 	if opts.gt && opts.lt {

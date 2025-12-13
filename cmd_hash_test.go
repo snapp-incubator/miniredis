@@ -684,3 +684,557 @@ func TestHashRandField(t *testing.T) {
 		proto.Error(msgInvalidInt),
 	)
 }
+
+func TestParseHExpireArgs(t *testing.T) {
+	tests := []struct {
+		name        string
+		args        []string
+		want        hexpireOpts
+		wantErr     string
+		description string
+	}{
+		{
+			name: "basic usage",
+			args: []string{"mykey", "300", "FIELDS", "2", "field1", "field2"},
+			want: hexpireOpts{
+				key:    "mykey",
+				ttl:    300,
+				fields: []string{"field1", "field2"},
+			},
+			wantErr:     "",
+			description: "Basic HEXPIRE with key, ttl, and fields",
+		},
+		{
+			name: "with NX option",
+			args: []string{"mykey", "300", "NX", "FIELDS", "1", "field1"},
+			want: hexpireOpts{
+				key:    "mykey",
+				ttl:    300,
+				nx:     true,
+				fields: []string{"field1"},
+			},
+			wantErr:     "",
+			description: "HEXPIRE with NX flag",
+		},
+		{
+			name: "with XX option",
+			args: []string{"mykey", "300", "XX", "FIELDS", "1", "field1"},
+			want: hexpireOpts{
+				key:    "mykey",
+				ttl:    300,
+				xx:     true,
+				fields: []string{"field1"},
+			},
+			wantErr:     "",
+			description: "HEXPIRE with XX flag",
+		},
+		{
+			name: "with GT option",
+			args: []string{"mykey", "300", "GT", "FIELDS", "1", "field1"},
+			want: hexpireOpts{
+				key:    "mykey",
+				ttl:    300,
+				gt:     true,
+				fields: []string{"field1"},
+			},
+			wantErr:     "",
+			description: "HEXPIRE with GT flag",
+		},
+		{
+			name: "with LT option",
+			args: []string{"mykey", "300", "LT", "FIELDS", "1", "field1"},
+			want: hexpireOpts{
+				key:    "mykey",
+				ttl:    300,
+				lt:     true,
+				fields: []string{"field1"},
+			},
+			wantErr:     "",
+			description: "HEXPIRE with LT flag",
+		},
+		{
+			name: "multiple options",
+			args: []string{"mykey", "300", "XX", "GT", "FIELDS", "3", "f1", "f2", "f3"},
+			want: hexpireOpts{
+				key:    "mykey",
+				ttl:    300,
+				xx:     true,
+				gt:     true,
+				fields: []string{"f1", "f2", "f3"},
+			},
+			wantErr:     "",
+			description: "HEXPIRE with multiple options",
+		},
+		{
+			name:        "invalid TTL",
+			args:        []string{"mykey", "invalid", "FIELDS", "1", "field1"},
+			want:        hexpireOpts{},
+			wantErr:     msgInvalidInt,
+			description: "Invalid TTL value should return error",
+		},
+		{
+			name: "missing FIELDS keyword",
+			args: []string{"mykey", "300"},
+			want: hexpireOpts{
+				key: "mykey",
+				ttl: 300,
+			},
+			wantErr:     "",
+			description: "Missing FIELDS is OK - validation happens at command level",
+		},
+		{
+			name:        "invalid numFields",
+			args:        []string{"mykey", "300", "FIELDS", "invalid", "field1"},
+			want:        hexpireOpts{},
+			wantErr:     msgNumFieldsInvalid,
+			description: "Invalid numFields should return error",
+		},
+		{
+			name:        "zero numFields",
+			args:        []string{"mykey", "300", "FIELDS", "0"},
+			want:        hexpireOpts{},
+			wantErr:     msgNumFieldsInvalid,
+			description: "Zero numFields should return error",
+		},
+		{
+			name:        "negative numFields",
+			args:        []string{"mykey", "300", "FIELDS", "-1"},
+			want:        hexpireOpts{},
+			wantErr:     msgNumFieldsInvalid,
+			description: "Negative numFields should return error",
+		},
+		{
+			name:        "not enough fields provided",
+			args:        []string{"mykey", "300", "FIELDS", "3", "field1"},
+			want:        hexpireOpts{},
+			wantErr:     msgNumFieldsParameter,
+			description: "Not enough fields provided should return error",
+		},
+		{
+			name:        "GT and LT together",
+			args:        []string{"mykey", "300", "GT", "LT", "FIELDS", "1", "field1"},
+			want:        hexpireOpts{},
+			wantErr:     msgGTandLT,
+			description: "GT and LT together should return error",
+		},
+		{
+			name:        "NX and XX together",
+			args:        []string{"mykey", "300", "NX", "XX", "FIELDS", "1", "field1"},
+			want:        hexpireOpts{},
+			wantErr:     msgNXandXXGTLT,
+			description: "NX and XX together should return error",
+		},
+		{
+			name:        "NX and GT together",
+			args:        []string{"mykey", "300", "NX", "GT", "FIELDS", "1", "field1"},
+			want:        hexpireOpts{},
+			wantErr:     msgNXandXXGTLT,
+			description: "NX and GT together should return error",
+		},
+		{
+			name:        "NX and LT together",
+			args:        []string{"mykey", "300", "NX", "LT", "FIELDS", "1", "field1"},
+			want:        hexpireOpts{},
+			wantErr:     msgNXandXXGTLT,
+			description: "NX and LT together should return error",
+		},
+		{
+			name: "case insensitive options",
+			args: []string{"mykey", "300", "nx", "fields", "1", "field1"},
+			want: hexpireOpts{
+				key:    "mykey",
+				ttl:    300,
+				nx:     true,
+				fields: []string{"field1"},
+			},
+			wantErr:     "",
+			description: "Options should be case insensitive",
+		},
+		{
+			name: "multiple fields",
+			args: []string{"mykey", "300", "FIELDS", "5", "f1", "f2", "f3", "f4", "f5"},
+			want: hexpireOpts{
+				key:    "mykey",
+				ttl:    300,
+				fields: []string{"f1", "f2", "f3", "f4", "f5"},
+			},
+			wantErr:     "",
+			description: "Should handle multiple fields correctly",
+		},
+		{
+			name: "negative TTL",
+			args: []string{"mykey", "-1", "FIELDS", "1", "field1"},
+			want: hexpireOpts{
+				key:    "mykey",
+				ttl:    -1,
+				fields: []string{"field1"},
+			},
+			wantErr:     "",
+			description: "Negative TTL should be accepted (for immediate expiration)",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, gotErr := parseHExpireArgs(tt.args)
+
+			// Check error
+			if tt.wantErr != "" {
+				if gotErr == "" {
+					t.Errorf("parseHExpireArgs() error = %q, wantErr containing %q", gotErr, tt.wantErr)
+					return
+				}
+				// Check if the error contains the expected message
+				if !contains(gotErr, tt.wantErr) {
+					t.Errorf("parseHExpireArgs() error = %q, wantErr containing %q", gotErr, tt.wantErr)
+				}
+				return
+			}
+
+			if gotErr != "" {
+				t.Errorf("parseHExpireArgs() unexpected error = %q", gotErr)
+				return
+			}
+
+			// Check result
+			if got.key != tt.want.key {
+				t.Errorf("parseHExpireArgs() key = %q, want %q", got.key, tt.want.key)
+			}
+			if got.ttl != tt.want.ttl {
+				t.Errorf("parseHExpireArgs() ttl = %d, want %d", got.ttl, tt.want.ttl)
+			}
+			if got.nx != tt.want.nx {
+				t.Errorf("parseHExpireArgs() nx = %v, want %v", got.nx, tt.want.nx)
+			}
+			if got.xx != tt.want.xx {
+				t.Errorf("parseHExpireArgs() xx = %v, want %v", got.xx, tt.want.xx)
+			}
+			if got.gt != tt.want.gt {
+				t.Errorf("parseHExpireArgs() gt = %v, want %v", got.gt, tt.want.gt)
+			}
+			if got.lt != tt.want.lt {
+				t.Errorf("parseHExpireArgs() lt = %v, want %v", got.lt, tt.want.lt)
+			}
+			if len(got.fields) != len(tt.want.fields) {
+				t.Errorf("parseHExpireArgs() fields length = %d, want %d", len(got.fields), len(tt.want.fields))
+			} else {
+				for i := range got.fields {
+					if got.fields[i] != tt.want.fields[i] {
+						t.Errorf("parseHExpireArgs() fields[%d] = %q, want %q", i, got.fields[i], tt.want.fields[i])
+					}
+				}
+			}
+		})
+	}
+}
+
+func contains(s, substr string) bool {
+	if len(substr) == 0 {
+		return true
+	}
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
+}
+
+func TestHexpire(t *testing.T) {
+	s, c := runWithClient(t)
+
+	t.Run("basic expiration", func(t *testing.T) {
+		must1(t, c, "HSET", "myhash", "field1", "value1")
+		mustDo(t, c,
+			"HEXPIRE", "myhash", "10", "FIELDS", "1", "field1",
+			proto.Ints(1),
+		)
+	})
+
+	t.Run("expire multiple fields", func(t *testing.T) {
+		mustDo(t, c, "HSET", "myhash2", "field1", "value1", "field2", "value2", proto.Int(2))
+		mustDo(t, c,
+			"HEXPIRE", "myhash2", "20", "FIELDS", "2", "field1", "field2",
+			proto.Ints(1, 1),
+		)
+	})
+
+	t.Run("expire non-existent field", func(t *testing.T) {
+		must1(t, c, "HSET", "myhash3", "field1", "value1")
+		mustDo(t, c,
+			"HEXPIRE", "myhash3", "10", "FIELDS", "1", "nonexistent",
+			proto.Ints(-2),
+		)
+	})
+
+	t.Run("expire on non-existent key", func(t *testing.T) {
+		mustDo(t, c,
+			"HEXPIRE", "nokey", "10", "FIELDS", "1", "field1",
+			proto.Ints(-2),
+		)
+	})
+
+	t.Run("NX option - set only when no expiration", func(t *testing.T) {
+		must1(t, c, "HSET", "hash2", "f1", "v1")
+		
+		// First time should succeed (no expiration set)
+		mustDo(t, c,
+			"HEXPIRE", "hash2", "10", "NX", "FIELDS", "1", "f1",
+			proto.Ints(1),
+		)
+		
+		// Second time should fail (expiration already set)
+		mustDo(t, c,
+			"HEXPIRE", "hash2", "20", "NX", "FIELDS", "1", "f1",
+			proto.Ints(0),
+		)
+	})
+
+	t.Run("XX option - set only when expiration exists", func(t *testing.T) {
+		must1(t, c, "HSET", "hash3", "f1", "v1")
+		
+		// First time should fail (no expiration set)
+		mustDo(t, c,
+			"HEXPIRE", "hash3", "10", "XX", "FIELDS", "1", "f1",
+			proto.Ints(0),
+		)
+		
+		// Set expiration first
+		mustDo(t, c,
+			"HEXPIRE", "hash3", "10", "FIELDS", "1", "f1",
+			proto.Ints(1),
+		)
+		
+		// Now XX should succeed
+		mustDo(t, c,
+			"HEXPIRE", "hash3", "20", "XX", "FIELDS", "1", "f1",
+			proto.Ints(1),
+		)
+	})
+
+	t.Run("GT option - set only when new expiration is greater", func(t *testing.T) {
+		must1(t, c, "HSET", "hash4", "f1", "v1")
+		
+		// Set initial expiration
+		mustDo(t, c,
+			"HEXPIRE", "hash4", "10", "FIELDS", "1", "f1",
+			proto.Ints(1),
+		)
+		
+		// Try to set lower expiration with GT - should fail
+		mustDo(t, c,
+			"HEXPIRE", "hash4", "5", "GT", "FIELDS", "1", "f1",
+			proto.Ints(0),
+		)
+		
+		// Set higher expiration with GT - should succeed
+		mustDo(t, c,
+			"HEXPIRE", "hash4", "20", "GT", "FIELDS", "1", "f1",
+			proto.Ints(1),
+		)
+	})
+
+	t.Run("LT option - set only when new expiration is less", func(t *testing.T) {
+		must1(t, c, "HSET", "hash5", "f1", "v1")
+		
+		// Set initial expiration
+		mustDo(t, c,
+			"HEXPIRE", "hash5", "20", "FIELDS", "1", "f1",
+			proto.Ints(1),
+		)
+		
+		// Try to set higher expiration with LT - should fail
+		mustDo(t, c,
+			"HEXPIRE", "hash5", "30", "LT", "FIELDS", "1", "f1",
+			proto.Ints(0),
+		)
+		
+		// Set lower expiration with LT - should succeed
+		mustDo(t, c,
+			"HEXPIRE", "hash5", "10", "LT", "FIELDS", "1", "f1",
+			proto.Ints(1),
+		)
+	})
+
+	t.Run("field expiration actually expires", func(t *testing.T) {
+		mustDo(t, c, "HSET", "hash6", "f1", "v1", "f2", "v2", proto.Int(2))
+		
+		// Set very short expiration
+		mustDo(t, c,
+			"HEXPIRE", "hash6", "1", "FIELDS", "1", "f1",
+			proto.Ints(1),
+		)
+		
+		// Field should exist now
+		mustDo(t, c,
+			"HGET", "hash6", "f1",
+			proto.String("v1"),
+		)
+		
+		// Fast forward past expiration
+		s.FastForward(2 * time.Second)
+		
+		// Field should be gone
+		mustDo(t, c,
+			"HGET", "hash6", "f1",
+			proto.Nil,
+		)
+		
+		// But other field should still exist
+		mustDo(t, c,
+			"HGET", "hash6", "f2",
+			proto.String("v2"),
+		)
+	})
+
+	t.Run("all fields expired removes hash", func(t *testing.T) {
+		must1(t, c, "HSET", "hash7", "f1", "v1")
+		
+		// Set very short expiration
+		mustDo(t, c,
+			"HEXPIRE", "hash7", "1", "FIELDS", "1", "f1",
+			proto.Ints(1),
+		)
+		
+		// Hash should exist
+		mustDo(t, c,
+			"EXISTS", "hash7",
+			proto.Int(1),
+		)
+		
+		// Fast forward past expiration
+		s.FastForward(2 * time.Second)
+		
+		// Hash should be gone
+		mustDo(t, c,
+			"EXISTS", "hash7",
+			proto.Int(0),
+		)
+	})
+
+	t.Run("error cases", func(t *testing.T) {
+		mustOK(t, c, "SET", "stringkey", "value")
+		
+		// Wrong number of arguments
+		mustDo(t, c,
+			"HEXPIRE", "myhash",
+			proto.Error(errWrongNumber("hexpire")),
+		)
+		
+		// Wrong type
+		mustDo(t, c,
+			"HEXPIRE", "stringkey", "10", "FIELDS", "1", "field1",
+			proto.Error(msgWrongType),
+		)
+		
+		// Invalid TTL
+		mustDo(t, c,
+			"HEXPIRE", "myhash", "notanumber", "FIELDS", "1", "field1",
+			proto.Error(msgInvalidInt),
+		)
+		
+		// Invalid numFields
+		mustDo(t, c,
+			"HEXPIRE", "myhash", "10", "FIELDS", "notanumber", "field1",
+			proto.Error(msgNumFieldsInvalid),
+		)
+		
+		// Zero numFields - needs at least one dummy field to pass atLeast(5) check
+		mustDo(t, c,
+			"HEXPIRE", "myhash", "10", "FIELDS", "0", "dummy",
+			proto.Error(msgNumFieldsInvalid),
+		)
+		
+		// Not enough fields
+		mustDo(t, c,
+			"HEXPIRE", "myhash", "10", "FIELDS", "2", "field1",
+			proto.Error(msgNumFieldsParameter),
+		)
+		
+		// GT and LT together
+		mustDo(t, c,
+			"HEXPIRE", "myhash", "10", "GT", "LT", "FIELDS", "1", "field1",
+			proto.Error(msgGTandLT),
+		)
+		
+		// NX and XX together
+		mustDo(t, c,
+			"HEXPIRE", "myhash", "10", "NX", "XX", "FIELDS", "1", "field1",
+			proto.Error(msgNXandXXGTLT),
+		)
+	})
+
+	t.Run("negative TTL for immediate expiration", func(t *testing.T) {
+		mustDo(t, c, "HSET", "hash8", "f1", "v1", "f2", "v2", proto.Int(2))
+		
+		// Set negative expiration (immediate expiration)
+		mustDo(t, c,
+			"HEXPIRE", "hash8", "-1", "FIELDS", "1", "f1",
+			proto.Ints(1),
+		)
+		
+		// Fast forward a tiny bit
+		s.FastForward(100 * time.Millisecond)
+		
+		// Field should be gone
+		mustDo(t, c,
+			"HGET", "hash8", "f1",
+			proto.Nil,
+		)
+	})
+
+	t.Run("case insensitive options", func(t *testing.T) {
+		must1(t, c, "HSET", "hash9", "f1", "v1")
+		
+		mustDo(t, c,
+			"HEXPIRE", "hash9", "10", "nx", "fields", "1", "f1",
+			proto.Ints(1),
+		)
+	})
+
+	t.Run("TTL is actually stored in hashTTLs map", func(t *testing.T) {
+		must1(t, c, "HSET", "hash10", "field1", "value1")
+		
+		// Set TTL
+		mustDo(t, c,
+			"HEXPIRE", "hash10", "300", "FIELDS", "1", "field1",
+			proto.Ints(1),
+		)
+		
+		// Verify TTL is stored in the internal map
+		// Note: s.DB(0) internally handles locking
+		fieldTTLs, ok := s.DB(0).hashTTLs["hash10"]
+		if !ok {
+			t.Fatal("hashTTLs map not created for key")
+		}
+		ttl, ok := fieldTTLs["field1"]
+		if !ok {
+			t.Fatal("TTL not set for field1")
+		}
+		expectedTTL := 300 * time.Second
+		if ttl != expectedTTL {
+			t.Errorf("TTL mismatch: got %v, want %v", ttl, expectedTTL)
+		}
+		
+		// Set another field's TTL
+		must1(t, c, "HSET", "hash10", "field2", "value2")
+		mustDo(t, c,
+			"HEXPIRE", "hash10", "600", "FIELDS", "1", "field2",
+			proto.Ints(1),
+		)
+		
+		// Verify both TTLs are stored
+		fieldTTLs = s.DB(0).hashTTLs["hash10"]
+		if len(fieldTTLs) != 2 {
+			t.Errorf("Expected 2 field TTLs, got %d", len(fieldTTLs))
+		}
+		ttl1 := fieldTTLs["field1"]
+		ttl2 := fieldTTLs["field2"]
+		if ttl1 != 300*time.Second {
+			t.Errorf("field1 TTL mismatch: got %v, want %v", ttl1, 300*time.Second)
+		}
+		if ttl2 != 600*time.Second {
+			t.Errorf("field2 TTL mismatch: got %v, want %v", ttl2, 600*time.Second)
+		}
+	})
+}
