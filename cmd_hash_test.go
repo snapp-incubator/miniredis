@@ -1238,3 +1238,153 @@ func TestHexpire(t *testing.T) {
 		}
 	})
 }
+
+func TestCheckHashFieldTTL(t *testing.T) {
+	s := NewMiniRedis()
+	defer s.Close()
+
+	t.Run("no TTLs set - no-op", func(t *testing.T) {
+		s.HSet("hash1", "field1", "value1")
+		s.HSet("hash1", "field2", "value2")
+		
+		// Call checkHashFieldTTL with no TTLs set
+		s.DB(0).checkHashFieldTTL("hash1", 5*time.Second)
+		
+		// Fields should still exist
+		equals(t, "value1", s.HGet("hash1", "field1"))
+		equals(t, "value2", s.HGet("hash1", "field2"))
+	})
+
+	t.Run("key not in hashTTLs map - no-op", func(t *testing.T) {
+		s.HSet("hash2", "field1", "value1")
+		
+		// Call checkHashFieldTTL for a key not in hashTTLs
+		s.DB(0).checkHashFieldTTL("hash2", 5*time.Second)
+		
+		// Field should still exist
+		equals(t, "value1", s.HGet("hash2", "field1"))
+	})
+
+	t.Run("TTL decrements correctly", func(t *testing.T) {
+		s.HSet("hash3", "field1", "value1")
+		
+		// Manually set TTL
+		db := s.DB(0)
+		db.hashTTLs["hash3"] = map[string]time.Duration{
+			"field1": 10 * time.Second,
+		}
+		
+		// Decrement by 3 seconds
+		db.checkHashFieldTTL("hash3", 3*time.Second)
+		
+		// TTL should be 7 seconds now
+		equals(t, 7*time.Second, db.hashTTLs["hash3"]["field1"])
+		equals(t, "value1", s.HGet("hash3", "field1"))
+	})
+
+	t.Run("field expires when TTL reaches zero", func(t *testing.T) {
+		s.HSet("hash4", "field1", "value1")
+		s.HSet("hash4", "field2", "value2")
+		
+		// Set TTL that will expire
+		db := s.DB(0)
+		db.hashTTLs["hash4"] = map[string]time.Duration{
+			"field1": 2 * time.Second,
+		}
+		
+		// Decrement past zero
+		db.checkHashFieldTTL("hash4", 3*time.Second)
+		
+		// field1 should be deleted
+		equals(t, "", s.HGet("hash4", "field1"))
+		// field2 should still exist
+		equals(t, "value2", s.HGet("hash4", "field2"))
+		// TTL entry should be removed
+		_, exists := db.hashTTLs["hash4"]["field1"]
+		equals(t, false, exists)
+	})
+
+	t.Run("multiple fields with different TTLs", func(t *testing.T) {
+		s.HSet("hash5", "field1", "value1")
+		s.HSet("hash5", "field2", "value2")
+		s.HSet("hash5", "field3", "value3")
+		
+		db := s.DB(0)
+		db.hashTTLs["hash5"] = map[string]time.Duration{
+			"field1": 2 * time.Second,
+			"field2": 5 * time.Second,
+			"field3": 10 * time.Second,
+		}
+		
+		// Decrement by 3 seconds
+		db.checkHashFieldTTL("hash5", 3*time.Second)
+		
+		// field1 should be deleted (2-3 = -1 <= 0)
+		equals(t, "", s.HGet("hash5", "field1"))
+		// field2 should still exist with 2 seconds left
+		equals(t, "value2", s.HGet("hash5", "field2"))
+		equals(t, 2*time.Second, db.hashTTLs["hash5"]["field2"])
+		// field3 should still exist with 7 seconds left
+		equals(t, "value3", s.HGet("hash5", "field3"))
+		equals(t, 7*time.Second, db.hashTTLs["hash5"]["field3"])
+	})
+
+	t.Run("hash deleted when all fields expire", func(t *testing.T) {
+		s.HSet("hash6", "field1", "value1")
+		s.HSet("hash6", "field2", "value2")
+		
+		db := s.DB(0)
+		db.hashTTLs["hash6"] = map[string]time.Duration{
+			"field1": 2 * time.Second,
+			"field2": 3 * time.Second,
+		}
+		
+		// Decrement past all TTLs
+		db.checkHashFieldTTL("hash6", 5*time.Second)
+		
+		// Both fields should be deleted
+		equals(t, "", s.HGet("hash6", "field1"))
+		equals(t, "", s.HGet("hash6", "field2"))
+		
+		// Hash key should not exist
+		assert(t, !s.Exists("hash6"), "hash6 should be deleted")
+	})
+
+	t.Run("hash not deleted when some fields remain", func(t *testing.T) {
+		s.HSet("hash7", "field1", "value1")
+		s.HSet("hash7", "field2", "value2")
+		
+		db := s.DB(0)
+		db.hashTTLs["hash7"] = map[string]time.Duration{
+			"field1": 2 * time.Second,
+			// field2 has no TTL
+		}
+		
+		// Decrement past field1's TTL
+		db.checkHashFieldTTL("hash7", 3*time.Second)
+		
+		// field1 should be deleted
+		equals(t, "", s.HGet("hash7", "field1"))
+		// field2 should still exist (no TTL)
+		equals(t, "value2", s.HGet("hash7", "field2"))
+		
+		// Hash key should still exist
+		assert(t, s.Exists("hash7"), "hash7 should still exist")
+	})
+
+	t.Run("negative TTL causes immediate expiration", func(t *testing.T) {
+		s.HSet("hash8", "field1", "value1")
+		
+		db := s.DB(0)
+		db.hashTTLs["hash8"] = map[string]time.Duration{
+			"field1": -1 * time.Second,
+		}
+		
+		// Any decrement should trigger deletion
+		db.checkHashFieldTTL("hash8", 1*time.Millisecond)
+		
+		// field should be deleted
+		equals(t, "", s.HGet("hash8", "field1"))
+		assert(t, !s.Exists("hash8"), "hash8 should be deleted")
+	})
+}
