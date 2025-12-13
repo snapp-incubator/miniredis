@@ -976,13 +976,13 @@ func TestHexpire(t *testing.T) {
 
 	t.Run("NX option - set only when no expiration", func(t *testing.T) {
 		must1(t, c, "HSET", "hash2", "f1", "v1")
-		
+
 		// First time should succeed (no expiration set)
 		mustDo(t, c,
 			"HEXPIRE", "hash2", "10", "NX", "FIELDS", "1", "f1",
 			proto.Ints(1),
 		)
-		
+
 		// Second time should fail (expiration already set)
 		mustDo(t, c,
 			"HEXPIRE", "hash2", "20", "NX", "FIELDS", "1", "f1",
@@ -992,19 +992,19 @@ func TestHexpire(t *testing.T) {
 
 	t.Run("XX option - set only when expiration exists", func(t *testing.T) {
 		must1(t, c, "HSET", "hash3", "f1", "v1")
-		
+
 		// First time should fail (no expiration set)
 		mustDo(t, c,
 			"HEXPIRE", "hash3", "10", "XX", "FIELDS", "1", "f1",
 			proto.Ints(0),
 		)
-		
+
 		// Set expiration first
 		mustDo(t, c,
 			"HEXPIRE", "hash3", "10", "FIELDS", "1", "f1",
 			proto.Ints(1),
 		)
-		
+
 		// Now XX should succeed
 		mustDo(t, c,
 			"HEXPIRE", "hash3", "20", "XX", "FIELDS", "1", "f1",
@@ -1014,19 +1014,19 @@ func TestHexpire(t *testing.T) {
 
 	t.Run("GT option - set only when new expiration is greater", func(t *testing.T) {
 		must1(t, c, "HSET", "hash4", "f1", "v1")
-		
+
 		// Set initial expiration
 		mustDo(t, c,
 			"HEXPIRE", "hash4", "10", "FIELDS", "1", "f1",
 			proto.Ints(1),
 		)
-		
+
 		// Try to set lower expiration with GT - should fail
 		mustDo(t, c,
 			"HEXPIRE", "hash4", "5", "GT", "FIELDS", "1", "f1",
 			proto.Ints(0),
 		)
-		
+
 		// Set higher expiration with GT - should succeed
 		mustDo(t, c,
 			"HEXPIRE", "hash4", "20", "GT", "FIELDS", "1", "f1",
@@ -1036,19 +1036,19 @@ func TestHexpire(t *testing.T) {
 
 	t.Run("LT option - set only when new expiration is less", func(t *testing.T) {
 		must1(t, c, "HSET", "hash5", "f1", "v1")
-		
+
 		// Set initial expiration
 		mustDo(t, c,
 			"HEXPIRE", "hash5", "20", "FIELDS", "1", "f1",
 			proto.Ints(1),
 		)
-		
+
 		// Try to set higher expiration with LT - should fail
 		mustDo(t, c,
 			"HEXPIRE", "hash5", "30", "LT", "FIELDS", "1", "f1",
 			proto.Ints(0),
 		)
-		
+
 		// Set lower expiration with LT - should succeed
 		mustDo(t, c,
 			"HEXPIRE", "hash5", "10", "LT", "FIELDS", "1", "f1",
@@ -1058,28 +1058,28 @@ func TestHexpire(t *testing.T) {
 
 	t.Run("field expiration actually expires", func(t *testing.T) {
 		mustDo(t, c, "HSET", "hash6", "f1", "v1", "f2", "v2", proto.Int(2))
-		
+
 		// Set very short expiration
 		mustDo(t, c,
 			"HEXPIRE", "hash6", "1", "FIELDS", "1", "f1",
 			proto.Ints(1),
 		)
-		
+
 		// Field should exist now
 		mustDo(t, c,
 			"HGET", "hash6", "f1",
 			proto.String("v1"),
 		)
-		
+
 		// Fast forward past expiration
 		s.FastForward(2 * time.Second)
-		
+
 		// Field should be gone
 		mustDo(t, c,
 			"HGET", "hash6", "f1",
 			proto.Nil,
 		)
-		
+
 		// But other field should still exist
 		mustDo(t, c,
 			"HGET", "hash6", "f2",
@@ -1089,22 +1089,22 @@ func TestHexpire(t *testing.T) {
 
 	t.Run("all fields expired removes hash", func(t *testing.T) {
 		must1(t, c, "HSET", "hash7", "f1", "v1")
-		
+
 		// Set very short expiration
 		mustDo(t, c,
 			"HEXPIRE", "hash7", "1", "FIELDS", "1", "f1",
 			proto.Ints(1),
 		)
-		
+
 		// Hash should exist
 		mustDo(t, c,
 			"EXISTS", "hash7",
 			proto.Int(1),
 		)
-		
+
 		// Fast forward past expiration
 		s.FastForward(2 * time.Second)
-		
+
 		// Hash should be gone
 		mustDo(t, c,
 			"EXISTS", "hash7",
@@ -1114,49 +1114,49 @@ func TestHexpire(t *testing.T) {
 
 	t.Run("error cases", func(t *testing.T) {
 		mustOK(t, c, "SET", "stringkey", "value")
-		
+
 		// Wrong number of arguments
 		mustDo(t, c,
 			"HEXPIRE", "myhash",
 			proto.Error(errWrongNumber("hexpire")),
 		)
-		
+
 		// Wrong type
 		mustDo(t, c,
 			"HEXPIRE", "stringkey", "10", "FIELDS", "1", "field1",
 			proto.Error(msgWrongType),
 		)
-		
+
 		// Invalid TTL
 		mustDo(t, c,
 			"HEXPIRE", "myhash", "notanumber", "FIELDS", "1", "field1",
 			proto.Error(msgInvalidInt),
 		)
-		
+
 		// Invalid numFields
 		mustDo(t, c,
 			"HEXPIRE", "myhash", "10", "FIELDS", "notanumber", "field1",
 			proto.Error(msgNumFieldsInvalid),
 		)
-		
+
 		// Zero numFields - needs at least one dummy field to pass atLeast(5) check
 		mustDo(t, c,
 			"HEXPIRE", "myhash", "10", "FIELDS", "0", "dummy",
 			proto.Error(msgNumFieldsInvalid),
 		)
-		
+
 		// Not enough fields
 		mustDo(t, c,
 			"HEXPIRE", "myhash", "10", "FIELDS", "2", "field1",
 			proto.Error(msgNumFieldsParameter),
 		)
-		
+
 		// GT and LT together
 		mustDo(t, c,
 			"HEXPIRE", "myhash", "10", "GT", "LT", "FIELDS", "1", "field1",
 			proto.Error(msgGTandLT),
 		)
-		
+
 		// NX and XX together
 		mustDo(t, c,
 			"HEXPIRE", "myhash", "10", "NX", "XX", "FIELDS", "1", "field1",
@@ -1166,16 +1166,16 @@ func TestHexpire(t *testing.T) {
 
 	t.Run("negative TTL for immediate expiration", func(t *testing.T) {
 		mustDo(t, c, "HSET", "hash8", "f1", "v1", "f2", "v2", proto.Int(2))
-		
+
 		// Set negative expiration (immediate expiration)
 		mustDo(t, c,
 			"HEXPIRE", "hash8", "-1", "FIELDS", "1", "f1",
 			proto.Ints(1),
 		)
-		
+
 		// Fast forward a tiny bit
 		s.FastForward(100 * time.Millisecond)
-		
+
 		// Field should be gone
 		mustDo(t, c,
 			"HGET", "hash8", "f1",
@@ -1185,7 +1185,7 @@ func TestHexpire(t *testing.T) {
 
 	t.Run("case insensitive options", func(t *testing.T) {
 		must1(t, c, "HSET", "hash9", "f1", "v1")
-		
+
 		mustDo(t, c,
 			"HEXPIRE", "hash9", "10", "nx", "fields", "1", "f1",
 			proto.Ints(1),
@@ -1194,13 +1194,13 @@ func TestHexpire(t *testing.T) {
 
 	t.Run("TTL is actually stored in hashTTLs map", func(t *testing.T) {
 		must1(t, c, "HSET", "hash10", "field1", "value1")
-		
+
 		// Set TTL
 		mustDo(t, c,
 			"HEXPIRE", "hash10", "300", "FIELDS", "1", "field1",
 			proto.Ints(1),
 		)
-		
+
 		// Verify TTL is stored in the internal map
 		// Note: s.DB(0) internally handles locking
 		fieldTTLs, ok := s.DB(0).hashTTLs["hash10"]
@@ -1215,14 +1215,14 @@ func TestHexpire(t *testing.T) {
 		if ttl != expectedTTL {
 			t.Errorf("TTL mismatch: got %v, want %v", ttl, expectedTTL)
 		}
-		
+
 		// Set another field's TTL
 		must1(t, c, "HSET", "hash10", "field2", "value2")
 		mustDo(t, c,
 			"HEXPIRE", "hash10", "600", "FIELDS", "1", "field2",
 			proto.Ints(1),
 		)
-		
+
 		// Verify both TTLs are stored
 		fieldTTLs = s.DB(0).hashTTLs["hash10"]
 		if len(fieldTTLs) != 2 {
