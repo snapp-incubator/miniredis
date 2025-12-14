@@ -5,7 +5,7 @@ import (
 	"sort"
 	"sync"
 
-	"github.com/alicebob/miniredis/v2/server"
+	"github.com/snapp-incubator/miniredis/v2/server"
 )
 
 // PubsubMessage is what gets broadcasted over pubsub channels.

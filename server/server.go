@@ -9,7 +9,7 @@ import (
 	"sync"
 	"unicode"
 
-	"github.com/alicebob/miniredis/v2/fpconv"
+	"github.com/snapp-incubator/miniredis/v2/fpconv"
 )
 
 func errUnknownCommand(cmd string, args []string) string {

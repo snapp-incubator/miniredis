@@ -11,8 +11,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/alicebob/miniredis/v2"
-	"github.com/alicebob/miniredis/v2/proto"
+	"github.com/snapp-incubator/miniredis/v2"
+	"github.com/snapp-incubator/miniredis/v2/proto"
 )
 
 func skip(t testing.TB) {

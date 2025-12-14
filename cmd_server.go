@@ -7,8 +7,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/alicebob/miniredis/v2/server"
-	"github.com/alicebob/miniredis/v2/size"
+	"github.com/snapp-incubator/miniredis/v2/server"
+	"github.com/snapp-incubator/miniredis/v2/size"
 )
 
 func commandsServer(m *Miniredis) {
