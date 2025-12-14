@@ -1,4 +1,4 @@
-module github.com/alicebob/miniredis/v2
+module github.com/snapp-incubator/miniredis/v2
 
 require github.com/yuin/gopher-lua v1.1.1
 
