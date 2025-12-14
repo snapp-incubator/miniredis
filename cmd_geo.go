@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/alicebob/miniredis/v2/server"
+	"github.com/snapp-incubator/miniredis/v2/server"
 )
 
 // commandsGeo handles GEOADD, GEORADIUS etc.

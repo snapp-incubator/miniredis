@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alicebob/miniredis/v2/proto"
+	"github.com/snapp-incubator/miniredis/v2/proto"
 )
 
 // Test DBSIZE, FLUSHDB, and FLUSHALL.

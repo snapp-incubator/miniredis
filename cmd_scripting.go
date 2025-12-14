@@ -12,8 +12,8 @@ import (
 	lua "github.com/yuin/gopher-lua"
 	"github.com/yuin/gopher-lua/parse"
 
-	luajson "github.com/alicebob/miniredis/v2/gopher-json"
-	"github.com/alicebob/miniredis/v2/server"
+	luajson "github.com/snapp-incubator/miniredis/v2/gopher-json"
+	"github.com/snapp-incubator/miniredis/v2/server"
 )
 
 func commandsScripting(m *Miniredis) {

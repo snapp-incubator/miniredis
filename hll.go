@@ -1,7 +1,7 @@
 package miniredis
 
 import (
-	"github.com/alicebob/miniredis/v2/hyperloglog"
+	"github.com/snapp-incubator/miniredis/v2/hyperloglog"
 )
 
 type hll struct {

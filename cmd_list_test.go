@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alicebob/miniredis/v2/proto"
+	"github.com/snapp-incubator/miniredis/v2/proto"
 )
 
 // execute command in a go routine. Used to test blocking commands.

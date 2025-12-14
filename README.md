@@ -18,7 +18,7 @@ There are no dependencies on external binaries, so you can easily integrate it i
 
 Be sure to import v2:
 ```
-import "github.com/alicebob/miniredis/v2"
+import "github.com/snapp-incubator/miniredis/v2"
 ```
 
 ## Commands
@@ -262,7 +262,7 @@ Commands which use randomness are: RANDOMKEY, SPOP, and SRANDMEMBER.
 
 import (
     ...
-    "github.com/alicebob/miniredis/v2"
+    "github.com/snapp-incubator/miniredis/v2"
     ...
 )
 
@@ -337,6 +337,6 @@ an issue.
 
 If you want to test Redis Sentinel have a look at [minisentinel](https://github.com/Bose/minisentinel).
 
-A changelog is kept at [CHANGELOG.md](https://github.com/alicebob/miniredis/blob/master/CHANGELOG.md).
+A changelog is kept at [CHANGELOG.md](https://github.com/snapp-incubator/miniredis/blob/master/CHANGELOG.md).
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/alicebob/miniredis/v2.svg)](https://pkg.go.dev/github.com/alicebob/miniredis/v2)
+[![Go Reference](https://pkg.go.dev/badge/github.com/snapp-incubator/miniredis/v2.svg)](https://pkg.go.dev/github.com/snapp-incubator/miniredis/v2)

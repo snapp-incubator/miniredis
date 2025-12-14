@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alicebob/miniredis/v2/server"
+	"github.com/snapp-incubator/miniredis/v2/server"
 )
 
 func TestRedis(t *testing.T) {
